@@ -1,0 +1,90 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "triggerCallback"
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const input = items[0].json;\nlet payload = input.payload;\nlet headers = {};\ninput.headers.forEach(h => { if (h.Key) headers[h.Key] = h.Value; });\nif(input.authType === 'Basic Auth'){\n  const b64 = Buffer.from(`${input.authDetails.username}:${input.authDetails.password}`).toString('base64');\n  headers['Authorization'] = `Basic ${b64}`;\n}\nelse if(input.authType === 'OAuth2'){\n  const tokenRes = await this.helpers.request({\n    method: 'POST', url: input.authDetails.tokenUrl,\n    form: { grant_type: 'client_credentials', client_id: input.authDetails.clientId, client_secret: input.authDetails.clientSecret }\n  });\n  const token = JSON.parse(tokenRes).access_token;\n  headers['Authorization'] = `Bearer ${token}`;\n}\nelse if(input.authType === 'AES Encrypted'){\n  const crypto = require('crypto');\n  const key = Buffer.from(input.authDetails.aesKey, 'base64');\n  const iv = Buffer.from(input.authDetails.iv, 'base64');\n  const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);\n  let enc = cipher.update(JSON.stringify(payload), 'utf8', 'base64');\n  enc += cipher.final('base64');\n  payload = { data: enc };\n}\nreturn [{ json: { callbackUrl: input.callbackUrl, method: input.method, headers, payload } }];"
+      },
+      "name": "Prepare Request",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$json[\"callbackUrl\"]}}",
+        "method": "={{$json[\"method\"]}}",
+        "headers": "={{$json[\"headers\"]}}",
+        "jsonParameters": true,
+        "bodyParametersJson": "={{$json[\"payload\"]}}"
+      },
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        750,
+        300
+      ]
+    },
+    {
+      "parameters": {},
+      "name": "Respond",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Prepare Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Request": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

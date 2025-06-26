@@ -1,0 +1,24 @@
+
+version: "3.7"
+
+services:
+  appsmith:
+    image: appsmith/appsmith-ce
+    container_name: appsmith
+    ports:
+      - "8080:80"
+    volumes:
+      - ./appsmith-stacks:/appsmith-stacks
+
+  n8n:
+    image: n8nio/n8n
+    container_name: n8n
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=admin123
+      - WEBHOOK_URL=http://localhost:5678
+    volumes:
+      - ./n8n-data:/home/node/.n8n
